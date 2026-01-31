@@ -1,22 +1,21 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react"; // 👈 Added Suspense
 import { motion, AnimatePresence } from "framer-motion";
 import { Lock, Mail, LayoutDashboard, ShieldCheck, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+// 1. Create a separate component for the form logic
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   
-  const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 1. Capture external errors (like Middleware redirects)
   useEffect(() => {
     const urlError = searchParams.get("error");
     if (urlError === "CredentialsSignin") {
@@ -32,21 +31,16 @@ export default function LoginPage() {
     setError(null);
 
     try {
-      // 2. Execute Auth with explicit redirect control
       const result = await signIn("credentials", {
-        email: email.toLowerCase().trim(), // Normalize input
+        email: email.toLowerCase().trim(),
         password,
         redirect: false,
       });
 
       if (result?.error) {
-        // Handle specific failure
         setError("Login Rejected: Incorrect credentials or unauthorized shop.");
         setLoading(false);
       } else {
-        // 3. Success: Force refresh and redirect
-        // Using window.location instead of router.push can sometimes solve 
-        // Vercel session propagation issues.
         window.location.href = "/";
       }
     } catch (err) {
@@ -55,6 +49,69 @@ export default function LoginPage() {
     }
   };
 
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <AnimatePresence mode="wait">
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-6 p-5 bg-red-50 text-red-600 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-3"
+          >
+            <AlertCircle size={16} />
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="space-y-2">
+        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-3">Email Identity</label>
+        <div className="relative">
+          <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+          <input 
+            type="email" 
+            required 
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@medcommand.com" 
+            className="w-full pl-16 pr-6 py-5 bg-slate-50 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 font-bold transition-all border-none text-slate-800" 
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-3">Security Key</label>
+        <div className="relative">
+          <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+          <input 
+            type="password" 
+            required 
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••" 
+            className="w-full pl-16 pr-6 py-5 bg-slate-50 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 font-bold transition-all border-none text-slate-800" 
+          />
+        </div>
+      </div>
+
+      <button 
+        disabled={loading}
+        className="group w-full bg-slate-900 text-white py-6 rounded-[3rem] font-black uppercase tracking-[0.2em] text-[10px] mt-6 flex items-center justify-center gap-4 hover:bg-blue-600 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {loading ? "Verifying_Identity..." : (
+          <>
+            Initialize Dashboard 
+            <LayoutDashboard size={18} className="group-hover:rotate-12 transition-transform" />
+          </>
+        )}
+      </button>
+    </form>
+  );
+}
+
+// 2. Main Page Export with Suspense Boundary
+export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-[#f8fafc] p-6">
       <motion.div 
@@ -73,63 +130,10 @@ export default function LoginPage() {
           <p className="text-slate-400 text-sm mt-2 font-medium">Access your medical management hub.</p>
         </header>
 
-        <AnimatePresence mode="wait">
-          {error && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="mb-6 p-5 bg-red-50 text-red-600 rounded-[2rem] text-[10px] font-black uppercase tracking-widest border border-red-100 flex items-center gap-3"
-            >
-              <AlertCircle size={16} />
-              {error}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-3">Email Identity</label>
-            <div className="relative">
-              <Mail className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input 
-                type="email" 
-                required 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@medcommand.com" 
-                className="w-full pl-16 pr-6 py-5 bg-slate-50 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 font-bold transition-all border-none text-slate-800" 
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-3">Security Key</label>
-            <div className="relative">
-              <Lock className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-              <input 
-                type="password" 
-                required 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••" 
-                className="w-full pl-16 pr-6 py-5 bg-slate-50 rounded-[2.5rem] outline-none focus:bg-white focus:ring-4 focus:ring-blue-500/5 font-bold transition-all border-none text-slate-800" 
-              />
-            </div>
-          </div>
-
-          <button 
-            disabled={loading}
-            className="group w-full bg-slate-900 text-white py-6 rounded-[3rem] font-black uppercase tracking-[0.2em] text-[10px] mt-6 flex items-center justify-center gap-4 hover:bg-blue-600 transition-all shadow-xl active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? "Verifying_Identity..." : (
-              <>
-                Initialize Dashboard 
-                <LayoutDashboard size={18} className="group-hover:rotate-12 transition-transform" />
-              </>
-            )}
-          </button>
-        </form>
+        {/* 3. Wrap form in Suspense to fix Vercel Build Error */}
+        <Suspense fallback={<div className="text-center p-10 font-black uppercase text-[10px] text-slate-400 animate-pulse tracking-widest">Loading_Gateway...</div>}>
+          <LoginForm />
+        </Suspense>
 
         <footer className="mt-12 text-center pt-8 border-t border-slate-50">
           <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
