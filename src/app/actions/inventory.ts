@@ -4,16 +4,21 @@ import { connectDB } from "@/lib/mongodb";
 import { Product } from "@/models/Product";
 import { Transaction } from "@/models/Transaction";
 import { revalidatePath } from "next/cache";
-import { getServerSession } from "next-auth/next"; // To identify the shopkeeper
+import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"; 
 
 /**
  * HELPER: GET CURRENT USER ID
- * Ensures no one can perform actions without being logged in.
+ * Ensures the 'id' exists and satisfies TypeScript.
  */
 async function getUserId() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user) throw new Error("Unauthorized Access");
+  
+  // Explicitly check for session and user id to satisfy strict TS checks
+  if (!session || !session.user || !session.user.id) {
+    throw new Error("Unauthorized Access: Terminal session required.");
+  }
+  
   return session.user.id;
 }
 
@@ -21,7 +26,7 @@ async function getUserId() {
 
 export async function addProduct(formData: FormData) {
   await connectDB();
-  const userId = await getUserId(); // 👈 Multi-tenant: Get current shopkeeper ID
+  const userId = await getUserId();
 
   const name = formData.get("name") as string;
   const quantity = Number(formData.get("quantity"));
@@ -34,7 +39,7 @@ export async function addProduct(formData: FormData) {
     price,
     sku: manualSku || `SKU-${Math.random().toString(36).substring(7).toUpperCase()}`,
     status: quantity < 5 ? "LOW_STOCK" : "NOMINAL",
-    owner: userId // 👈 Link product to this shopkeeper
+    owner: userId 
   });
 
   revalidatePath("/");
@@ -45,14 +50,14 @@ export async function editProduct(id: string, formData: FormData) {
   await connectDB();
   const userId = await getUserId();
 
+  const quantity = Number(formData.get("quantity"));
   const updateData = {
     name: formData.get("name") as string,
-    quantity: Number(formData.get("quantity")),
+    quantity: quantity,
     price: Number(formData.get("price")),
-    status: Number(formData.get("quantity")) < 5 ? "LOW_STOCK" : "NOMINAL"
+    status: quantity < 5 ? "LOW_STOCK" : "NOMINAL"
   };
 
-  // 👈 Multi-tenant: Only update if the product belongs to the user
   await Product.findOneAndUpdate({ _id: id, owner: userId }, updateData);
   
   revalidatePath("/");
@@ -63,7 +68,6 @@ export async function deleteProduct(id: string) {
   await connectDB();
   const userId = await getUserId();
 
-  // 👈 Multi-tenant: Only delete if the product belongs to the user
   await Product.findOneAndDelete({ _id: id, owner: userId });
   
   revalidatePath("/");
@@ -73,24 +77,31 @@ export async function deleteProduct(id: string) {
 // --- BILLING & SALES LOGIC ---
 
 export async function processSale(cartItems: any[], total: number, customerName: string) {
-  await connectDB();
-  const userId = await getUserId();
-
   try {
+    await connectDB();
+    const userId = await getUserId();
+
     const billId = `INV-${new Date().getFullYear()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const finalCustomerName = customerName?.trim() || "Walk-in Customer";
 
-    // 1. Update Inventory Stock (Filtered by Owner)
+    // 1. Update Inventory Stock (Atomic operation with owner check)
     await Promise.all(
       cartItems.map((item) =>
         Product.findOneAndUpdate(
-          { _id: item._id, owner: userId }, // 👈 Security: Ensure user owns the item they are selling
-          { $inc: { quantity: -item.cartQty } }
-        )
+          { _id: item._id, owner: userId }, 
+          { $inc: { quantity: -item.cartQty } },
+          { new: true }
+        ).then(updated => {
+          // Update status if stock falls low during sale
+          if (updated && updated.quantity < 5) {
+            updated.status = "LOW_STOCK";
+            return updated.save();
+          }
+        })
       )
     );
 
-    // 2. Create Transaction linked to the Owner
+    // 2. Create Transaction
     const newTx = await Transaction.create({
       billId: billId,
       customerName: finalCustomerName,
@@ -101,7 +112,7 @@ export async function processSale(cartItems: any[], total: number, customerName:
       })),
       total: total,
       timestamp: new Date(),
-      owner: userId // 👈 Store who made the sale
+      owner: userId 
     });
 
     revalidatePath("/");
@@ -111,8 +122,8 @@ export async function processSale(cartItems: any[], total: number, customerName:
       success: true, 
       billData: JSON.parse(JSON.stringify(newTx)) 
     };
-  } catch (error) {
-    console.error("Sale Process Error:", error);
-    return { success: false };
+  } catch (error: any) {
+    console.error("Sale Process Error:", error.message);
+    return { success: false, error: error.message };
   }
 }
