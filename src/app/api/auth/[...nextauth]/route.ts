@@ -14,14 +14,21 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        // 1. Ensure DB Connection
         await connectDB();
-        const user = await User.findOne({ email: credentials?.email });
-        if (!user) throw new Error("No user found with this email");
 
+        // 2. Normalize email to lowercase (Matches registration logic)
+        const email = credentials?.email?.toLowerCase();
+
+        // 3. Find User
+        const user = await User.findOne({ email });
+        if (!user) throw new Error("No user found with this email identity");
+
+        // 4. Verify Password
         const isValid = await bcrypt.compare(credentials!.password, user.password);
-        if (!isValid) throw new Error("Incorrect password");
+        if (!isValid) throw new Error("Security check failed: Incorrect password");
 
-        // ONLY return small strings
+        // 5. Return object (Keep it lean to avoid 431 Header errors)
         return {
           id: user._id.toString(),
           name: user.name,
@@ -37,7 +44,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.shopName = (user as any).shopName;
       }
-      // Captures updates without the heavy logo
+      // Captures updates from the Settings page
       if (trigger === "update" && session) {
         token.name = session.user.name;
         token.shopName = session.user.shopName;
@@ -52,8 +59,14 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
-  pages: { signIn: "/login" },
-  session: { strategy: "jwt" },
+  pages: { 
+    signIn: "/login",
+    error: "/login", // Redirects back to login on failure instead of hanging
+  },
+  session: { 
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   secret: process.env.NEXTAUTH_SECRET,
 };
 
