@@ -1,24 +1,23 @@
-import mongoose, { Schema, model, models } from 'mongoose';
+import mongoose, { Schema, model, models } from "mongoose";
 
-// We define the schema explicitly every time to force a refresh
 const TransactionSchema = new Schema({
-  billId: { type: String, required: true },
-  customerName: { type: String, default: "Walk-in Customer" },
-  items: [{
-    name: String,
-    quantity: Number,
-    price: Number
-  }],
-  total: Number,
-  timestamp: { type: Date, default: Date.now }
-}, { 
-  strict: false, // 👈 ADD THIS: It tells Mongoose "allow fields even if they aren't in the schema"
-  timestamps: true 
-});
+  billId: { type: String, required: true, unique: true },
+  customerName: { type: String, required: true },
+  items: [
+    {
+      name: { type: String, required: true },
+      quantity: { type: Number, required: true },
+      price: { type: Number, required: true },
+    }
+  ],
+  total: { type: Number, required: true },
+  timestamp: { type: Date, default: Date.now },
+  // 👈 ADD THIS FIELD
+  owner: { 
+    type: Schema.Types.ObjectId, 
+    ref: "User", 
+    required: true 
+  },
+}, { timestamps: true });
 
-// Delete the old model from cache if it exists, then recreate it
-if (models.Transaction) {
-  delete models.Transaction;
-}
-
-export const Transaction = model('Transaction', TransactionSchema);
+export const Transaction = models.Transaction || model("Transaction", TransactionSchema);
