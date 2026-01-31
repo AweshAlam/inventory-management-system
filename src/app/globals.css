@@ -1,26 +1,64 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+  --color-card-bg: #ffffff;
+  --color-accent: #3b82f6;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  background-color: var(--color-background);
+  color: var(--color-foreground);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* Bento Card Custom Utility */
+@utility bento-card {
+  background-color: white;
+  border-width: 1px;
+  border-color: var(--color-slate-200);
+  border-radius: 2rem;
+  padding: 2rem;
+  box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.05);
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 300ms;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  &:hover {
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
+    transform: translateY(-0.25rem);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.crt-overlay, .background-pattern {
+  pointer-events: none !important;
+  z-index: -1; /* Keep it behind the UI */
 }
+
+/* Ensure Links are always clickable */
+a, button {
+  position: relative;
+  z-index: 10;
+}
+
+@media print {
+  /* Hide everything except the receipt */
+  body * {
+    visibility: hidden;
+  }
+  #printable-receipt, #printable-receipt * {
+    visibility: visible;
+  }
+  #printable-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+  }
+  /* Hide UI-specific buttons from print */
+  .no-print {
+    display: none !important;
+  }
+}
+
