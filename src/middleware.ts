@@ -1,21 +1,18 @@
 import { withAuth } from "next-auth/middleware";
 
+// This is the default export Next.js is looking for
 export default withAuth({
   pages: {
     signIn: "/login",
   },
 });
 
-export const config = { 
-  /*
-   * Match all request paths except for the ones starting with:
-   * - api/auth (NextAuth internal routes)
-   * - _next/static (static files)
-   * - _next/image (image optimization files)
-   * - favicon.ico (favicon file)
-   * - public images/assets
-   */
+// Define which routes are protected.
+// Any page matching these paths will require a login.
+export const config = {
   matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|images).*)",
-  ] 
+    "/", // Dashboard
+    "/inventory", // Warehouse
+    "/billing", // Sales Terminal
+  ],
 };
