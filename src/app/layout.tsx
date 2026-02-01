@@ -7,8 +7,11 @@ const inter = Inter({ subsets: ["latin"] });
 
 // Metadata updated for the Medical Billing context
 export const metadata: Metadata = {
-  title: "Stock Command | Medical Billing",
-  description: "Enterprise Medical Billing & Inventory Management v2.0",
+  title: "Binary IMS | Inventory Managemen",
+  description: "Made with ❤️ by Awesh",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
 export default function RootLayout({
